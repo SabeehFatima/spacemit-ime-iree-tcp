@@ -9,34 +9,39 @@
 </p>
 
 Teaching the LLVM/IREE compiler stack to recognize an ordinary matrix
-multiply and automatically use **SpacemiT's Integer Matrix Extension (IME)**
-— a RISC-V hardware instruction (`vmadot`) purpose-built for int8 matrix
-multiply-accumulate — with no changes to the source code being compiled.
+multiply and automatically use SpacemiT's Integer Matrix Extension (IME) —
+a RISC-V hardware instruction (`vmadot`) built for int8 matrix
+multiply-accumulate — without changing the source code being compiled.
+
+## How it flows
+
+```mermaid
+flowchart LR
+    A["linalg.matmul<br/>(ordinary code)"] --> B["vector.contract<br/>(generic MLIR)"]
+    B --> C["riscv_ime.vmadot<br/>(this project)"]
+    C --> D["llvm.riscv.smt.vmadot<br/>(LLVM intrinsic)"]
+    D --> E["smt.vmadot<br/>(real hardware)"]
+```
 
 ## The result
 
-```text
-  linalg.matmul  →  vector.contract  →  riscv_ime.vmadot  →  smt.vmadot
-  (ordinary code)                       (this project)        (real hardware)
-```
-
-Compiled the exact same, unmodified matrix multiply two ways — with the
-hardware extension enabled and without — and measured it on a real RISC-V
-board:
+Compiled the same, unmodified matrix multiply two ways — once with the
+hardware extension enabled, once without — and measured it on a real
+RISC-V board.
 
 | | With `vmadot` | Without `vmadot` |
 |---|---|---|
 | Time per call (64×64 int8 matmul) | ~0.252 ms | ~0.510 ms |
 
-**~2× faster, automatically, with zero code changes.**
+Roughly 2x faster, and the compiler made that choice on its own.
 
-## Why this is three phases
+## Why three phases
 
 | Phase | What it does |
 |---|---|
 | [Phase 1 — LLVM](phase-1-llvm/) | Teaches the compiler the instruction exists at all — builtin, intrinsic, RISC-V backend support |
 | [Phase 2 — IREE ukernel](phase-2-iree/) | Proves the instruction actually works, by hand-writing one call to it |
-| [Phase 3 — MLIR/IREE](phase-3-mlir/) | Teaches the compiler to *find* opportunities to use it on its own, in ordinary code — this is what produced the benchmark above |
+| [Phase 3 — MLIR/IREE](phase-3-mlir/) | Teaches the compiler to find opportunities to use it on its own, in ordinary code — this is what produced the benchmark above |
 
 Each folder contains only the files that were added or changed, with a
 README covering what was built, what broke, and how it was fixed.
